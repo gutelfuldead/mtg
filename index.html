@@ -134,7 +134,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let S={cards:[],decks:[],importedAt:null};
 let INFO={};
 let view={name:'collection',deck:null};
-let ui={q:'',dq:'',filter:'all',colors:new Set(),type:'',limit:150,open:null,pending:null,importErr:'',newDeck:false,deckErr:'',edit:false,delArm:false,copyText:null,sortBy:'status',backup:null,backupErr:'',conflict:null,syncErr:'',connecting:false};
+let ui={q:'',dq:'',filter:'all',colors:new Set(),type:'',limit:150,open:null,pending:null,importErr:'',newDeck:false,deckErr:'',edit:false,delArm:false,copyText:null,sortBy:'status',backup:null,backupErr:'',conflict:null,siteConflict:null,syncErr:'',connecting:false};
 
 /* ---------- storage (IndexedDB on this device) ---------- */
 let idbP=null,canSave=true;
@@ -158,7 +158,21 @@ function saveSY(){try{SY?localStorage.setItem(SYNC_KEY,JSON.stringify(SY)):local
 function isDirty(){try{return localStorage.getItem('cardbinder.dirty')==='1'}catch(e){return false}}
 function setDirty(v){try{v?localStorage.setItem('cardbinder.dirty','1'):localStorage.removeItem('cardbinder.dirty')}catch(e){}}
 let syncing=false,again=false,pushT=null;
-function syncStatus(t){setSync(t||(SY?(isDirty()?'Changes waiting to sync':'Synced to GitHub'):'Saved on this device'))}
+function getSiteSaved(){try{return localStorage.getItem('cardbinder.siteSavedAt')}catch(e){return null}}
+function setSiteSaved(v){try{localStorage.setItem('cardbinder.siteSavedAt',v)}catch(e){}}
+function syncStatus(t){setSync(t||(SY?(isDirty()?'Changes waiting to sync':'Synced to GitHub'):isDirty()?'Saved on this device only':getSiteSaved()?'Loaded from your site':'Saved on this device'))}
+// Without sync connected, read the copy published next to this page (no token needed).
+let siteChecked=0;
+async function loadSite(){
+  if(SY||location.protocol==='file:')return;siteChecked=Date.now();
+  try{
+    const r=await fetch('card-binder.json?v='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const d=fromFile(await r.json());
+    if(!d.savedAt||d.savedAt===getSiteSaved())return;
+    if(isDirty()&&(S.cards.length||S.decks.length)){ui.siteConflict=d;render();return}
+    S={cards:d.cards,decks:d.decks,importedAt:d.importedAt};setSiteSaved(d.savedAt);setDirty(false);save(true);syncStatus();render();fetchInfo();
+  }catch(e){}
+}
 function gh(path,opts={}){
   const h={'Authorization':'Bearer '+SY.token,'Accept':opts.accept||'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
   if(opts.body)h['Content-Type']='application/json';
@@ -234,6 +248,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden'&&isDirty()&&!syncing)syncNow();
   else if(document.visibilityState==='visible'&&Date.now()-(SY.syncedAt||0)>20000)syncNow();
 });
+document.addEventListener('visibilitychange',()=>{if(!SY&&document.visibilityState==='visible'&&Date.now()-siteChecked>60000)loadSite()});
 window.addEventListener('online',()=>{if(SY&&isDirty())syncNow()});
 async function connect(owner,repo,token){
   let m=(owner+'/'+repo).match(/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
@@ -560,6 +575,7 @@ function renderImport(){
       '<div class="actions" style="margin-bottom:0"><button class="btn" data-act="syncnow">Sync now</button><button class="btn danger" data-act="disconnect">Disconnect this device</button></div></div>';
   }else{
     const gp=pagesRepo();
+    if(getSiteSaved())h+='<p class="note">This device is showing the copy published with your site. It can view everything, but edits stay on this device until you connect.</p>';
     h+='<p class="lead">Keep your collection, decks and proxy marks the same on every device. They’re saved as <code>card-binder.json</code> next to this page in its GitHub repo. Do this once on each device.</p><div class="panel">'+
       '<p class="note" style="margin-top:0">If the repo is public, anyone who looks can see your card list and decks.</p>'+
       '<ol class="steps">'+
@@ -586,6 +602,9 @@ function pagesRepo(){
   return {owner:m[1],repo:seg&&!/\.html?$/i.test(seg)?seg:m[1]+'.github.io'};
 }
 function conflictPanel(){
+  if(ui.siteConflict){const d=ui.siteConflict;
+    return '<div class="panel conflict"><strong>Your site has a newer copy than this device.</strong><p class="note" style="margin:6px 0 0">This device has changes that were never synced. Site copy: '+fmt(d.decks.length)+' decks, saved '+esc(new Date(d.savedAt).toLocaleString())+'.</p>'+
+      '<div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="sitetake">Use the site copy</button><button class="btn" data-act="sitekeep">Keep this device’s copy</button></div></div>';}
   const c=ui.conflict;if(!c)return '';
   const when=c.data.savedAt?new Date(c.data.savedAt).toLocaleString():'unknown time';
   return '<div class="panel conflict"><strong>Your data changed both here and in GitHub.</strong><p class="note" style="margin:6px 0 0">This device: '+fmt(S.decks.length)+' decks, '+fmt(S.cards.length)+' collection rows. GitHub: '+fmt(c.data.decks.length)+' decks, '+fmt(c.data.cards.length)+' rows, saved '+esc(when)+'. The other copy stays in the repo’s history either way.</p>'+
@@ -688,6 +707,8 @@ document.getElementById('app').addEventListener('click',e=>{
     connect(o,r,t).then(()=>{ui.connecting=false;render();syncNow()}).catch(err=>{ui.connecting=false;ui.syncErr=err instanceof TypeError?'Couldn’t reach GitHub. Check your connection.':err.message;render()});
   }
   else if(act==='syncnow')syncNow();
+  else if(act==='sitetake'){const d=ui.siteConflict;ui.siteConflict=null;S={cards:d.cards,decks:d.decks,importedAt:d.importedAt};setSiteSaved(d.savedAt);setDirty(false);save(true);syncStatus();render();fetchInfo()}
+  else if(act==='sitekeep'){setSiteSaved(ui.siteConflict.savedAt);ui.siteConflict=null;render()}
   else if(act==='disconnect'){SY=null;saveSY();ui.conflict=null;syncStatus();render()}
   else if(act==='keeplocal'){const c=ui.conflict;ui.conflict=null;SY.sha=c.sha;setDirty(true);saveSY();render();syncNow()}
   else if(act==='keepremote'){const c=ui.conflict;ui.conflict=null;applyRemote(c);SY.syncedAt=Date.now();saveSY();syncStatus()}
@@ -701,7 +722,7 @@ document.getElementById('app').addEventListener('click',e=>{
   setSync('Loading…');
   try{const st=await idbGet('state');if(st&&Array.isArray(st.cards))S=st;INFO=(await idbGet('info'))||{};syncStatus()}
   catch(e){canSave=false;setSync('This browser blocks storage, so changes won’t be kept')}
-  render();if(SY)await syncNow();fetchInfo();
+  render();if(SY)await syncNow();else await loadSite();fetchInfo();
 })();
 </script>
 </body>
