@@ -153,7 +153,7 @@ function saveInfo(){clearTimeout(infoT);infoT=setTimeout(()=>{idbSet('info',INFO
 
 /* ---------- GitHub sync ---------- */
 const SYNC_KEY='cardbinder.sync',FILE='card-binder.json';
-let SY=null;try{SY=JSON.parse(localStorage.getItem(SYNC_KEY)||'null')}catch(e){}
+let SY=null;try{SY=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');if(SY&&SY.branch){delete SY.branch;SY.sha=null}}catch(e){}
 function saveSY(){try{SY?localStorage.setItem(SYNC_KEY,JSON.stringify(SY)):localStorage.removeItem(SYNC_KEY)}catch(e){}}
 function isDirty(){try{return localStorage.getItem('cardbinder.dirty')==='1'}catch(e){return false}}
 function setDirty(v){try{v?localStorage.setItem('cardbinder.dirty','1'):localStorage.removeItem('cardbinder.dirty')}catch(e){}}
@@ -164,7 +164,20 @@ function gh(path,opts={}){
   if(opts.body)h['Content-Type']='application/json';
   return fetch('https://api.github.com'+path,{method:opts.method||'GET',headers:h,body:opts.body,cache:'no-store'});
 }
-const cpath=()=>'/repos/'+encodeURIComponent(SY.owner)+'/'+encodeURIComponent(SY.repo)+'/contents/'+FILE;
+const rpath=()=>'/repos/'+encodeURIComponent(SY.owner)+'/'+encodeURIComponent(SY.repo);
+const cpath=()=>rpath()+'/contents/'+FILE+(SY.branch?'?ref='+encodeURIComponent(SY.branch):'');
+async function ensureBranch(){
+  if(!SY.branch)return;
+  const r=await gh(rpath()+'/git/ref/heads/'+encodeURIComponent(SY.branch));
+  if(r.ok)return;
+  if(r.status!==404)throw ghErr(r);
+  const repo=await gh(rpath());if(!repo.ok)throw ghErr(repo);
+  const def=(await repo.json()).default_branch;
+  const head=await gh(rpath()+'/git/ref/heads/'+encodeURIComponent(def));if(!head.ok)throw ghErr(head);
+  const sha=(await head.json()).object.sha;
+  const c=await gh(rpath()+'/git/refs',{method:'POST',body:JSON.stringify({ref:'refs/heads/'+SY.branch,sha})});
+  if(!c.ok&&c.status!==422)throw ghErr(c);
+}
 function ghErr(r){const e=new Error(r.status===401?'GitHub rejected the token. It may have expired, so reconnect on the Import tab.':r.status===403?'GitHub refused access. Check the token has read and write access to this repo’s contents.':r.status===404?'Repo not found, or the token can’t see it.':'GitHub answered '+r.status+'.');e.status=r.status;return e}
 function b64enc(str){const b=new TextEncoder().encode(str);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
 function b64dec(b64){const bin=atob(b64.replace(/\s/g,''));const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u)}
@@ -185,8 +198,9 @@ async function readRemote(){
 }
 async function writeRemote(sha){
   const body={message:'Card Binder update '+new Date().toISOString().slice(0,16).replace('T',' '),content:b64enc(toFile())};
-  if(sha)body.sha=sha;
-  const r=await gh(cpath(),{method:'PUT',body:JSON.stringify(body)});
+  if(sha)body.sha=sha;else await ensureBranch();
+  if(SY.branch)body.branch=SY.branch;
+  const r=await gh(rpath()+'/contents/'+FILE,{method:'PUT',body:JSON.stringify(body)});
   if(r.status===409||r.status===422){const e=new Error('conflict');e.conflict=true;throw e}
   if(!r.ok)throw ghErr(r);
   return (await r.json()).content.sha;
@@ -231,7 +245,6 @@ async function connect(owner,repo,token){
     const r=await gh('/repos/'+encodeURIComponent(owner)+'/'+encodeURIComponent(repo));
     if(!r.ok)throw ghErr(r);
     const j=await r.json();
-    if(!j.private)throw new Error('That repo is public, so anyone could see your collection. Make it private in its Settings, then connect again.');
     if(j.permissions&&!j.permissions.push)throw new Error('The token can read this repo but not write to it. Give it Contents: Read and write.');
   }catch(e){SY=prev;throw e}
   saveSY();
@@ -535,20 +548,22 @@ function renderImport(){
   }
   h+='<h2 style="margin-top:22px">Sync with GitHub</h2>';
   if(SY){
-    h+='<div class="panel"><p style="margin-top:0">Syncing with <strong>'+esc(SY.owner+'/'+SY.repo)+'</strong>'+(SY.syncedAt?', last synced '+new Date(SY.syncedAt).toLocaleString():'')+'.</p>'+
+    h+='<div class="panel"><p style="margin-top:0">Syncing with <strong>'+esc(SY.owner+'/'+SY.repo)+'</strong>'+(SY.branch?' (<code>'+esc(SY.branch)+'</code> branch)':'')+(SY.syncedAt?', last synced '+new Date(SY.syncedAt).toLocaleString():'')+'.</p>'+
       '<p class="note">Changes upload a few seconds after you make them, and the latest copy downloads when you open the page.</p>'+
       '<div class="actions" style="margin-bottom:0"><button class="btn" data-act="syncnow">Sync now</button><button class="btn danger" data-act="disconnect">Disconnect this device</button></div></div>';
   }else{
-    h+='<p class="lead">Keep your collection, decks and proxy marks the same on every device, saved to a private GitHub repo. Do this once on each device.</p><div class="panel">'+
-      '<ol class="steps"><li><a href="https://github.com/new" target="_blank" rel="noopener">Create a new repository</a> named something like <code>card-binder-data</code>, and set it to <strong>Private</strong>.</li>'+
-      '<li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a>. Under Repository access pick <strong>Only select repositories</strong> and choose that repo. Under Permissions, set <strong>Contents</strong> to <strong>Read and write</strong>. Pick an expiration, then generate it and copy it.</li>'+
+    const gp=pagesRepo();
+    h+='<p class="lead">Keep your collection, decks and proxy marks the same on every device. They’re saved as <code>card-binder.json</code> next to this page in its GitHub repo. Do this once on each device.</p><div class="panel">'+
+      '<p class="note" style="margin-top:0">If the repo is public, anyone who looks can see your card list and decks.</p>'+
+      '<ol class="steps">'+
+      '<li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a>. Under Repository access pick <strong>Only select repositories</strong> and choose this site’s repo. Under Permissions, set <strong>Contents</strong> to <strong>Read and write</strong>. Pick an expiration, then generate it and copy it.</li>'+
       '<li>Fill in the fields below and connect.</li></ol>'+
-      '<label for="ghowner">GitHub username</label><input class="field" id="ghowner" autocomplete="off" autocapitalize="off" spellcheck="false">'+
-      '<label for="ghrepo">Repository name</label><input class="field" id="ghrepo" placeholder="card-binder-data" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+      '<label for="ghowner">GitHub username</label><input class="field" id="ghowner" value="'+esc(gp.owner)+'" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+      '<label for="ghrepo">Repository name</label><input class="field" id="ghrepo" value="'+esc(gp.repo)+'" placeholder="card-binder" autocomplete="off" autocapitalize="off" spellcheck="false">'+
       '<label for="ghtoken">Token</label><input class="field" id="ghtoken" type="password" placeholder="github_pat_…" autocomplete="off">'+
       (ui.syncErr?'<p class="err">'+esc(ui.syncErr)+'</p>':'')+
       '<div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="connect"'+(ui.connecting?' disabled':'')+'>'+(ui.connecting?'Connecting…':'Connect')+'</button></div>'+
-      '<p class="note" style="margin-bottom:0">The token is stored only in this browser and only unlocks that one repo. You can revoke it on GitHub anytime.</p></div>';
+      '<p class="note" style="margin-bottom:0">The token is stored only in this browser and only unlocks this one repo. Since that repo also holds the site, keep the token private. You can revoke it on GitHub anytime.</p></div>';
   }
   h+='<h2 style="margin-top:22px">Backup</h2><p class="lead">Everything is saved in this browser only. Save a backup file to move your decks and proxy marks to another device, or to keep them safe.</p><div class="panel">';
   if(ui.backup){
@@ -557,6 +572,11 @@ function renderImport(){
     h+='<div class="actions" style="margin-top:0"><button class="btn" data-act="export">Save backup file</button></div><label for="bfile">Load a backup file</label><input id="bfile" type="file" accept=".json,application/json">'+(ui.backupErr?'<p class="err">'+esc(ui.backupErr)+'</p>':'');
   }
   return h+'</div><p class="note" style="margin-top:18px">Card details and images come from Scryfall. Not affiliated with Wizards of the Coast.</p>';
+}
+function pagesRepo(){
+  const m=location.hostname.match(/^([^.]+)\.github\.io$/i);if(!m)return {owner:'',repo:''};
+  const seg=location.pathname.split('/').filter(Boolean)[0];
+  return {owner:m[1],repo:seg&&!/\.html?$/i.test(seg)?seg:m[1]+'.github.io'};
 }
 function conflictPanel(){
   const c=ui.conflict;if(!c)return '';
