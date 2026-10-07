@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Card Binder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Spectral:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F3;--surface:#FFFFFF;--ink:#1B2430;--muted:#5D6877;--line:#D5DBE2;--soft:#E3E8EE;
+  --owned:#2E7D57;--shared:#B98316;--missing:#B33A4A;--proxy:#5552C9;--basic:#9AA4B1;--accent:#2B4C7E;
+  --serif:"Spectral",Georgia,"Times New Roman",serif;
+  --sans:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161C;--surface:#1A2029;--ink:#E6EAF0;--muted:#98A3B3;--line:#2A323D;--soft:#222A35;
+  --owned:#4FB386;--shared:#E0AE45;--missing:#E06B7A;--proxy:#8E8BF2;--basic:#5F6B7A;--accent:#7FA6E0;
+}}
+:root[data-theme="dark"]{
+  --bg:#12161C;--surface:#1A2029;--ink:#E6EAF0;--muted:#98A3B3;--line:#2A323D;--soft:#222A35;
+  --owned:#4FB386;--shared:#E0AE45;--missing:#E06B7A;--proxy:#8E8BF2;--basic:#5F6B7A;--accent:#7FA6E0;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.top h1{font:700 1.5rem/1.1 var(--serif);margin:0;letter-spacing:-.01em}
+.sync{font-size:.8rem;color:var(--muted)}
+main{max-width:720px;margin:0 auto;padding:16px 14px 104px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{flex:1;border:0;background:none;padding:12px 4px 14px;font-weight:500;color:var(--muted);border-top:3px solid transparent}
+.tabs button[aria-current="page"]{color:var(--ink);border-top-color:var(--accent)}
+h2{font:700 1.35rem/1.2 var(--serif);margin:4px 0 4px}
+.lead{color:var(--muted);margin:0 0 14px;font-size:.95rem}
+.search{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:.88rem}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:flex;width:100%;align-items:center;gap:12px;padding:11px 14px 11px 16px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;position:relative}
+.sheet>.row:last-child,.sheet>div:last-child>.row{border-bottom:0}
+.row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--stripe,transparent)}
+.row .main{flex:1;min-width:0}
+.name{font:600 1.02rem/1.25 var(--serif);overflow-wrap:anywhere}
+.sub{font-size:.82rem;color:var(--muted);margin-top:2px}
+.qty{font:600 1.1rem/1 var(--sans);font-variant-numeric:tabular-nums;min-width:2ch;text-align:right}
+.badge{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.badge.warn{color:var(--missing)}
+.detail{padding:4px 16px 14px;border-bottom:1px solid var(--line);background:var(--soft);font-size:.88rem}
+.detail table{width:100%;border-collapse:collapse}
+.detail td{padding:5px 6px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.detail h3{font:600 .85rem/1.3 var(--sans);color:var(--muted);margin:12px 0 4px}
+.wrap{overflow-x:auto}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:600;font-size:.92rem}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.danger{color:var(--missing)}
+.btn.armed{background:var(--missing);border-color:var(--missing);color:var(--surface)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.empty{padding:28px 20px;text-align:center;color:var(--muted)}
+.empty p{margin:0 0 14px}
+textarea,.field{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px 12px}
+textarea{min-height:180px;font-size:.88rem;line-height:1.4}
+label{display:block;font-weight:600;font-size:.9rem;margin:12px 0 6px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.note{font-size:.85rem;color:var(--muted)}
+.err{color:var(--missing);font-weight:500}
+.more{display:block;width:100%;padding:12px;border:0;background:none;color:var(--accent);font-weight:600}
+/* allocation bar: the deck's 100 slots */
+.bar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--soft);margin:12px 0 8px}
+.bar.mini{height:6px;margin:6px 0 0}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--muted);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.s-owned{--stripe:var(--owned)} .s-shared{--stripe:var(--shared)} .s-short,.s-missing{--stripe:var(--missing)} .s-proxy{--stripe:var(--proxy)} .s-basic{--stripe:var(--basic)}
+.group{font:600 .85rem/1.3 var(--sans);color:var(--muted);margin:18px 2px 6px}
+.toggle{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:.8rem;font-weight:600;white-space:nowrap}
+.toggle[aria-pressed="true"]{background:var(--proxy);border-color:var(--proxy);color:var(--surface)}
+.back{border:0;background:none;color:var(--accent);font-weight:600;padding:0;margin-bottom:6px}
+.cmd{font-size:.9rem;color:var(--muted);margin:0}
+@media (prefers-reduced-motion:no-preference){.bar span{transition:flex-basis .3s ease}}
+
+.banner{position:sticky;top:calc(env(safe-area-inset-top,0px) + 57px);z-index:4;margin:0;padding:8px 18px;background:var(--accent);color:var(--surface);font-size:.85rem;font-weight:500}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px}
+.colorpick{display:flex;gap:6px}
+.pipbtn{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);font-weight:700;font-size:.85rem;opacity:.55}
+.pipbtn[aria-pressed="true"]{opacity:1;border-color:var(--ink)}
+select{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:7px 10px}
+.pips{display:inline-flex;gap:2px;vertical-align:2px}
+.pip{display:inline-block;width:15px;height:15px;border-radius:50%;font:700 9px/15px var(--sans);text-align:center;font-style:normal}
+.pW,.pipbtn.pW{background:#F4EDD2;color:#5B4B1A}.pU,.pipbtn.pU{background:#BFD9EC;color:#123A5B}.pB,.pipbtn.pB{background:#3A3437;color:#E9E1E4}.pR,.pipbtn.pR{background:#EDB8A1;color:#6A1E0A}.pG,.pipbtn.pG{background:#B9D8B5;color:#1E4A1A}
+.cost{font:500 .78rem var(--sans);color:var(--muted);letter-spacing:.04em}
+.rowbtn{border:0;background:none;padding:0;text-align:left;flex:1;min-width:0}
+.info{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding-top:10px}
+.info img{width:180px;max-width:100%;height:auto;border-radius:9px;background:var(--line)}
+.info>div{flex:1;min-width:180px}
+.tl{font-weight:600}
+.otext{white-space:pre-line;margin:6px 0 0}
+.curve{display:flex;gap:6px;align-items:flex-end;height:110px;margin:6px 0 4px;padding:0 2px}
+.curve div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.curve span{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px}
+.conflict{border-color:var(--shared);border-width:2px}
+.steps{margin:0 0 6px;padding-left:20px}.steps li{margin-bottom:8px}
+.steps a{color:var(--accent);font-weight:600}
+code{font-size:.88em;background:var(--soft);padding:1px 5px;border-radius:4px}
+.btn[disabled]{opacity:.6}
+.curve b{font-size:.75rem;margin-top:3px}.curve em{font-style:normal;font-size:.75rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top"><h1>Card binder</h1><span class="sync" id="sync" aria-live="polite"></span></header>
+<p class="banner" id="banner" hidden aria-live="polite"></p>
+<main id="app"></main>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <button data-view="collection">Collection</button>
+  <button data-view="decks">Decks</button>
+  <button data-view="import">Import</button>
+</nav>
+<script>
+const BASICS=new Set(['plains','island','swamp','mountain','forest','wastes']);
+const key=n=>String(n||'').split(' // ')[0].trim().toLowerCase().replace(/\s+/g,' ');
+const isBasic=k=>BASICS.has(k.replace(/^snow-covered /,''));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+let S={cards:[],decks:[],importedAt:null};
+let INFO={};
+let view={name:'collection',deck:null};
+let ui={q:'',dq:'',filter:'all',colors:new Set(),type:'',limit:150,open:null,pending:null,importErr:'',newDeck:false,deckErr:'',edit:false,delArm:false,copyText:null,sortBy:'status',backup:null,backupErr:'',conflict:null,syncErr:'',connecting:false};
+
+/* ---------- storage (IndexedDB on this device) ---------- */
+let idbP=null,canSave=true;
+function idb(){if(!idbP)idbP=new Promise((res,rej)=>{try{const r=indexedDB.open('cardbinder',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});return idbP}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+function setSync(t){document.getElementById('sync').textContent=t}
+let saveT=null,infoT=null;
+function save(fromRemote){
+  clearTimeout(saveT);saveT=setTimeout(async()=>{try{await idbSet('state',S);if(!SY)setSync('Saved on this device')}catch(e){canSave=false;setSync('Not saved: this browser blocks storage')}},300);
+  if(fromRemote)return;
+  setDirty(true);
+  if(SY){if(syncing)again=true;else schedulePush()}
+}
+function saveInfo(){clearTimeout(infoT);infoT=setTimeout(()=>{idbSet('info',INFO).catch(()=>{})},500)}
+
+/* ---------- GitHub sync ---------- */
+const SYNC_KEY='cardbinder.sync',FILE='card-binder.json';
+let SY=null;try{SY=JSON.parse(localStorage.getItem(SYNC_KEY)||'null')}catch(e){}
+function saveSY(){try{SY?localStorage.setItem(SYNC_KEY,JSON.stringify(SY)):localStorage.removeItem(SYNC_KEY)}catch(e){}}
+function isDirty(){try{return localStorage.getItem('cardbinder.dirty')==='1'}catch(e){return false}}
+function setDirty(v){try{v?localStorage.setItem('cardbinder.dirty','1'):localStorage.removeItem('cardbinder.dirty')}catch(e){}}
+let syncing=false,again=false,pushT=null;
+function syncStatus(t){setSync(t||(SY?(isDirty()?'Changes waiting to sync':'Synced to GitHub'):'Saved on this device'))}
+function gh(path,opts={}){
+  const h={'Authorization':'Bearer '+SY.token,'Accept':opts.accept||'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(opts.body)h['Content-Type']='application/json';
+  return fetch('https://api.github.com'+path,{method:opts.method||'GET',headers:h,body:opts.body,cache:'no-store'});
+}
+const cpath=()=>'/repos/'+encodeURIComponent(SY.owner)+'/'+encodeURIComponent(SY.repo)+'/contents/'+FILE;
+function ghErr(r){const e=new Error(r.status===401?'GitHub rejected the token. It may have expired, so reconnect on the Import tab.':r.status===403?'GitHub refused access. Check the token has read and write access to this repo’s contents.':r.status===404?'Repo not found, or the token can’t see it.':'GitHub answered '+r.status+'.');e.status=r.status;return e}
+function b64enc(str){const b=new TextEncoder().encode(str);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
+function b64dec(b64){const bin=atob(b64.replace(/\s/g,''));const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u)}
+const PK=['name','set','num','foil','qty','cond','lang','binder','inDeck','sid'];
+function toFile(){return JSON.stringify({app:'card-binder',version:2,savedAt:new Date().toISOString(),importedAt:S.importedAt,cardFields:PK,cards:S.cards.map(r=>PK.map(k=>r[k]??'')),decks:S.decks})}
+function fromFile(o){
+  if(!o||!Array.isArray(o.cards)||!Array.isArray(o.decks))throw new Error('That is not Card Binder data.');
+  const f=o.cardFields;
+  const cards=f?o.cards.map(a=>{const r={};f.forEach((k,i)=>r[k]=a[i]);r.foil=!!r.foil;r.inDeck=!!r.inDeck;return r}):o.cards;
+  return {cards,decks:o.decks,importedAt:o.importedAt||null,savedAt:o.savedAt||null};
+}
+async function readRemote(){
+  const r=await gh(cpath());if(r.status===404)return null;if(!r.ok)throw ghErr(r);
+  const m=await r.json();let text;
+  if(m.content&&m.encoding==='base64')text=b64dec(m.content);
+  else{const r2=await gh(cpath(),{accept:'application/vnd.github.raw+json'});if(!r2.ok)throw ghErr(r2);text=await r2.text()}
+  return {sha:m.sha,data:fromFile(JSON.parse(text))};
+}
+async function writeRemote(sha){
+  const body={message:'Card Binder update '+new Date().toISOString().slice(0,16).replace('T',' '),content:b64enc(toFile())};
+  if(sha)body.sha=sha;
+  const r=await gh(cpath(),{method:'PUT',body:JSON.stringify(body)});
+  if(r.status===409||r.status===422){const e=new Error('conflict');e.conflict=true;throw e}
+  if(!r.ok)throw ghErr(r);
+  return (await r.json()).content.sha;
+}
+function applyRemote(remote){
+  const d=remote.data;S={cards:d.cards,decks:d.decks,importedAt:d.importedAt};
+  SY.sha=remote.sha;setDirty(false);save(true);render();fetchInfo();
+}
+function schedulePush(){if(!SY)return;clearTimeout(pushT);syncStatus('Changes waiting to sync');pushT=setTimeout(()=>syncNow(),3000)}
+async function syncNow(depth=0){
+  if(!SY||syncing||ui.conflict)return;
+  clearTimeout(pushT);syncing=true;again=false;syncStatus('Syncing…');let ok=false;
+  try{
+    const remote=await readRemote(),dirty=isDirty(),hasLocal=S.cards.length||S.decks.length;
+    if(!remote){if(hasLocal)SY.sha=await writeRemote(null);setDirty(false)}
+    else if(remote.sha===SY.sha){if(dirty){SY.sha=await writeRemote(SY.sha);setDirty(false)}}
+    else if(!dirty&&!(SY.sha==null&&hasLocal))applyRemote(remote);
+    else{ui.conflict=remote;saveSY();render();syncStatus('Choose which copy to keep');return}
+    SY.syncedAt=Date.now();saveSY();ok=true;syncStatus();
+  }catch(e){
+    if(e.conflict&&depth<1){syncing=false;return syncNow(depth+1)}
+    syncStatus(e instanceof TypeError?'Offline, will sync later':'Sync problem: '+e.message);
+  }finally{
+    syncing=false;
+    if(ok&&again&&isDirty())schedulePush();
+    if(view.name==='import')render();
+  }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(!SY)return;
+  if(document.visibilityState==='hidden'&&isDirty()&&!syncing)syncNow();
+  else if(document.visibilityState==='visible'&&Date.now()-(SY.syncedAt||0)>20000)syncNow();
+});
+window.addEventListener('online',()=>{if(SY&&isDirty())syncNow()});
+async function connect(owner,repo,token){
+  let m=(owner+'/'+repo).match(/github\.com\/([^/\s]+)\/([^/\s#?]+)/);
+  if(m){owner=m[1];repo=m[2]}
+  repo=repo.replace(/\.git$/,'');
+  if(!owner||!repo||!token)throw new Error('Fill in your username, the repo name and the token.');
+  const prev=SY;SY={owner,repo,token,sha:null};
+  try{
+    const r=await gh('/repos/'+encodeURIComponent(owner)+'/'+encodeURIComponent(repo));
+    if(!r.ok)throw ghErr(r);
+    const j=await r.json();
+    if(!j.private)throw new Error('That repo is public, so anyone could see your collection. Make it private in its Settings, then connect again.');
+    if(j.permissions&&!j.permissions.push)throw new Error('The token can read this repo but not write to it. Give it Contents: Read and write.');
+  }catch(e){SY=prev;throw e}
+  saveSY();
+}
+
+/* ---------- Scryfall ---------- */
+function primary(front,layout){
+  if(/token|emblem/.test(layout||'')||/^Token\b/.test(front))return 'Token';
+  for(const t of ['Creature','Land','Planeswalker','Battle','Instant','Sorcery','Artifact','Enchantment'])if(new RegExp('\\b'+t+'\\b').test(front))return t;
+  return 'Other';
+}
+function cardInfo(c){
+  const f=(c.card_faces||[])[0]||{};
+  const tl=c.type_line||f.type_line||'';
+  const o=c.oracle_text!=null?c.oracle_text:(c.card_faces||[]).map(x=>x.name+'\n'+(x.oracle_text||'')).join('\n\n');
+  return {t:primary(tl.split(' // ')[0],c.layout),tl,ci:(c.color_identity||[]).join(''),mv:c.cmc||0,cost:c.mana_cost||f.mana_cost||'',o:o||'',img:(c.image_uris||f.image_uris||{}).normal||''};
+}
+let fetching=false;
+function banner(t){const b=document.getElementById('banner');b.textContent=t||'';b.hidden=!t}
+async function lookup(ids){
+  for(let attempt=0;attempt<3;attempt++){
+    const r=await fetch('https://api.scryfall.com/cards/collection',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({identifiers:ids})});
+    if(r.status===429){await sleep(1500*(attempt+1));continue}
+    if(!r.ok)throw new Error('Scryfall answered '+r.status);
+    return r.json();
+  }
+  throw new Error('Scryfall is busy');
+}
+function missingInfo(){
+  const need=new Map();
+  for(const r of S.cards){const k=key(r.name);if(!INFO[k]&&!need.has(k))need.set(k,{id:r.sid,name:r.name})}
+  for(const d of S.decks)for(const c of d.cards){const k=key(c.name);if(!INFO[k]&&!need.has(k))need.set(k,{name:c.name})}
+  return need;
+}
+async function fetchInfo(){
+  if(fetching)return;const need=missingInfo();if(!need.size)return;
+  fetching=true;const items=[...need.values()],byName=[];let done=0,failed=0;
+  try{
+    for(let i=0;i<items.length;i+=75){
+      const batch=items.slice(i,i+75);
+      banner('Looking up card details from Scryfall: '+fmt(done)+' of '+fmt(items.length));
+      const res=await lookup(batch.map(x=>x.id?{id:x.id}:{name:x.name}));
+      for(const c of res.data||[])INFO[key(c.name)]=cardInfo(c);
+      for(const nf of res.not_found||[])if(nf.id){const it=batch.find(x=>x.id===nf.id);if(it)byName.push(it.name)}else failed++;
+      done+=batch.length;saveInfo();await sleep(120);
+    }
+    for(let i=0;i<byName.length;i+=75){
+      const res=await lookup(byName.slice(i,i+75).map(name=>({name})));
+      for(const c of res.data||[])INFO[key(c.name)]=cardInfo(c);
+      failed+=(res.not_found||[]).length;saveInfo();await sleep(120);
+    }
+    banner(failed?fmt(failed)+' cards were not found on Scryfall.':'');
+    if(failed)setTimeout(()=>banner(''),6000);
+  }catch(e){banner('Card lookup stopped: '+e.message+'. It will retry next time you open the page.')}
+  finally{fetching=false;render()}
+}
+
+/* ---------- parsing ---------- */
+function parseCSV(text){
+  const first=text.split(/\r?\n/,1)[0]||'';
+  const delim=(first.split(';').length>first.split(',').length)?';':',';
+  const rows=[];let row=[],f='',inq=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inq){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else inq=false}else f+=c}
+    else if(c==='"')inq=true;
+    else if(c===delim){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}
+    else f+=c;
+  }
+  if(f!==''||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!==''));
+}
+function readCollection(text){
+  const rows=parseCSV(text.replace(/^\uFEFF/,''));
+  if(rows.length<2)throw new Error('That file has no card rows.');
+  const h=rows[0].map(x=>x.trim().toLowerCase());
+  const col=(...names)=>{for(const n of names){const i=h.indexOf(n);if(i>-1)return i}return -1};
+  const iN=col('name','card name'),iQ=col('quantity','count','qty'),iS=col('set code','set','edition'),
+        iC=col('collector number','collector #','number'),iF=col('foil','printing'),iCo=col('condition'),
+        iL=col('language'),iB=col('binder name','binder'),iT=col('binder type'),iP=col('proxy'),iId=col('scryfall id');
+  if(iN<0)throw new Error('No "Name" column found. In ManaBox, export your collection as CSV and pick that file.');
+  const out=[],decks=new Map();let skipped=0,proxies=0;
+  for(const r of rows.slice(1)){
+    const name=(r[iN]||'').trim();if(!name)continue;
+    const qty=iQ>-1?parseInt(r[iQ],10)||0:1;if(qty<=0)continue;
+    const type=iT>-1?(r[iT]||'').trim().toLowerCase():'binder';
+    if(type==='list'){skipped+=qty;continue}
+    const binder=iB>-1?(r[iB]||'').trim():'';
+    const isProxy=iP>-1&&/^(true|yes|1)$/i.test((r[iP]||'').trim());
+    if(type==='deck'&&binder){
+      if(!decks.has(binder))decks.set(binder,new Map());
+      const m=decks.get(binder),k=key(name),c=m.get(k)||{name,qty:0,proxy:false};
+      c.qty+=qty;if(isProxy)c.proxy=true;m.set(k,c);
+    }
+    if(isProxy){proxies+=qty;continue}
+    const fv=iF>-1?(r[iF]||'').trim().toLowerCase():'';
+    out.push({name,qty,set:iS>-1?(r[iS]||'').trim().toUpperCase():'',num:iC>-1?(r[iC]||'').trim():'',
+      foil:fv!==''&&fv!=='normal'&&fv!=='false'&&fv!=='no'&&fv!=='0',cond:iCo>-1?(r[iCo]||'').trim():'',
+      lang:iL>-1?(r[iL]||'').trim():'',binder,inDeck:type==='deck',sid:iId>-1?(r[iId]||'').trim():''});
+  }
+  if(!out.length&&!decks.size)throw new Error('No cards found in that file.');
+  return {cards:out,decks:[...decks].map(([name,m])=>({name,cards:[...m.values()]})),skipped,proxies};
+}
+function parseDeck(text){
+  const out=[];let sec='';
+  for(let line of text.split(/\r?\n/)){
+    line=line.trim();if(!line)continue;
+    const m=line.match(/^(\d+)\s*x?\s+(.+)$/i);
+    if(!m){sec=line.replace(/^\/\/\s*/,'').replace(/:$/,'').toLowerCase();continue}
+    if(/maybe|consider|wish/.test(sec))continue;
+    const name=m[2].replace(/\s+\*[A-Za-z]+\*\s*$/,'').replace(/\s+\[[^\]]*\]\s*$/,'')
+      .replace(/\s+\([A-Za-z0-9]{2,6}\)(\s+[\w★\-]+)?\s*$/,'').trim();
+    if(!name)continue;
+    const k=key(name),cmd=/commander/.test(sec),ex=out.find(x=>key(x.name)===k);
+    if(ex){ex.qty+=+m[1];if(cmd)ex.commander=true}
+    else out.push(Object.assign({name,qty:+m[1],proxy:false},cmd?{commander:true}:{}));
+  }
+  return out;
+}
+function deckText(d){
+  const c=d.cards.filter(x=>x.commander),r=d.cards.filter(x=>!x.commander);
+  return (c.length?'Commander\n'+c.map(x=>x.qty+' '+x.name).join('\n')+'\n\nDeck\n':'')+r.map(x=>x.qty+' '+x.name).join('\n');
+}
+
+/* ---------- derived state ---------- */
+function index(){
+  const owned=new Map(),demand=new Map();
+  for(const r of S.cards){const k=key(r.name);let o=owned.get(k);if(!o){o={name:r.name,qty:0,rows:[]};owned.set(k,o)}o.qty+=r.qty;o.rows.push(r)}
+  for(const d of S.decks){
+    const per=new Map();for(const c of d.cards){const k=key(c.name);per.set(k,{name:c.name,qty:(per.get(k)?.qty||0)+c.qty,proxy:c.proxy})}
+    for(const [k,v] of per){if(!demand.has(k))demand.set(k,{name:v.name,list:[]});demand.get(k).list.push({id:d.id,name:d.name,qty:v.qty,proxy:v.proxy})}
+  }
+  return {owned,demand};
+}
+const used=(IX,k)=>(IX.demand.get(k)?.list||[]).reduce((s,x)=>s+x.qty,0);
+function status(c,IX){
+  const k=key(c.name);if(isBasic(k))return 'basic';
+  const own=IX.owned.get(k)?.qty||0;
+  if(own>=used(IX,k))return 'owned';
+  if(c.proxy)return 'proxy';
+  if(own>=c.qty)return 'shared';
+  return own>0?'short':'missing';
+}
+const TYPES=['Creature','Planeswalker','Battle','Instant','Sorcery','Artifact','Enchantment','Land','Token','Other'];
+const TYPE_LABEL={Creature:'Creatures',Planeswalker:'Planeswalkers',Battle:'Battles',Instant:'Instants',Sorcery:'Sorceries',Artifact:'Artifacts',Enchantment:'Enchantments',Land:'Lands',Token:'Tokens',Other:'Other'};
+const COLORS={owned:'var(--owned)',shared:'var(--shared)',proxy:'var(--proxy)',short:'var(--missing)',missing:'var(--missing)',basic:'var(--basic)'};
+const WUBRG=['W','U','B','R','G'];
+const COLOR_NAME={W:'White',U:'Blue',B:'Black',R:'Red',G:'Green'};
+const typeOf=k=>INFO[k]?.t||(isBasic(k)?'Land':null);
+function tally(d,IX){const t={owned:0,shared:0,proxy:0,short:0,missing:0,basic:0,total:0};for(const c of d.cards){t[status(c,IX)]+=c.qty;t.total+=c.qty}return t}
+function bar(t,mini){
+  const tot=Math.max(t.total,1);
+  return '<div class="bar'+(mini?' mini':'')+'" role="img" aria-label="'+t.owned+' owned, '+t.shared+' shared, '+t.proxy+' proxies, '+(t.short+t.missing)+' missing">'+
+    ['owned','basic','shared','proxy','short','missing'].filter(s=>t[s]).map(s=>'<span style="flex-basis:'+(t[s]/tot*100)+'%;background:'+COLORS[s]+'"></span>').join('')+'</div>';
+}
+const pips=ci=>ci?'<span class="pips">'+[...ci].map(c=>'<i class="pip p'+c+'" title="'+COLOR_NAME[c]+'">'+c+'</i>').join('')+'</span>':'';
+const cost=s=>s?esc(s.replace(/[{}]/g,'')):'';
+function infoBlock(k){
+  const i=INFO[k];if(!i)return '<p class="note">Card details not looked up yet.</p>';
+  return '<div class="info">'+(i.img?'<img src="'+esc(i.img)+'" alt="" loading="lazy" width="244" height="340">':'')+
+    '<div><div class="tl">'+esc(i.tl)+(i.cost?' <span class="cost">'+cost(i.cost)+'</span>':'')+'</div>'+(i.o?'<p class="otext">'+esc(i.o)+'</p>':'')+'</div></div>';
+}
+
+/* ---------- views ---------- */
+function renderCollection(){
+  const IX=index();
+  if(!S.cards.length&&!S.decks.length)return '<h2>Collection</h2><div class="sheet empty"><p>Your collection is empty. Export it from ManaBox as a CSV, then import it here.</p><button class="btn primary" data-act="go" data-v="import">Import collection</button></div>';
+  let items;
+  if(ui.filter==='needed'){
+    items=[...IX.demand.entries()].filter(([k])=>!isBasic(k)).map(([k,v])=>{const own=IX.owned.get(k)?.qty||0,u=used(IX,k);return {k,name:v.name,own,u,need:u-own,proxied:v.list.every(x=>x.proxy)}}).filter(x=>x.need>0);
+  }else{
+    items=[...IX.owned.entries()].map(([k,o])=>({k,name:o.name,own:o.qty,u:used(IX,k),rows:o.rows}));
+    if(ui.filter==='indecks')items=items.filter(x=>x.u>0);
+    if(ui.filter==='free')items=items.filter(x=>x.own>x.u);
+  }
+  const qq=ui.q.trim().toLowerCase();if(qq)items=items.filter(x=>x.k.includes(qq)||(INFO[x.k]?.tl||'').toLowerCase().includes(qq));
+  if(ui.colors.size)items=items.filter(x=>{const i=INFO[x.k];return i&&[...i.ci].every(c=>ui.colors.has(c))});
+  if(ui.type)items=items.filter(x=>typeOf(x.k)===ui.type);
+  items.sort((a,b)=>a.name.localeCompare(b.name));
+  const copies=S.cards.reduce((s,r)=>s+r.qty,0);
+  const chip=(f,l)=>'<button class="chip" data-act="filter" data-f="'+f+'" aria-pressed="'+(ui.filter===f)+'">'+l+'</button>';
+  let h='<h2>Collection</h2><p class="lead">'+fmt(IX.owned.size)+' unique cards, '+fmt(copies)+' copies</p>'+
+    '<input class="search" id="search" type="search" placeholder="Search names or types, like “Elf” or “Equipment”" value="'+esc(ui.q)+'" autocomplete="off">'+
+    '<div class="chips">'+chip('all','All')+chip('indecks','In a deck')+chip('free','Not in a deck')+chip('needed','Needed for decks')+'</div>'+
+    '<div class="filters"><div class="colorpick" role="group" aria-label="Fits within colors">'+WUBRG.map(c=>'<button class="pipbtn p'+c+'" data-act="color" data-c="'+c+'" aria-pressed="'+ui.colors.has(c)+'" title="'+COLOR_NAME[c]+'">'+c+'</button>').join('')+'</div>'+
+    '<select id="tsel" aria-label="Card type"><option value="">All types</option>'+TYPES.map(t=>'<option value="'+t+'"'+(ui.type===t?' selected':'')+'>'+TYPE_LABEL[t]+'</option>').join('')+'</select></div>'+
+    (ui.colors.size?'<p class="note">Showing cards that fit a '+[...ui.colors].map(c=>COLOR_NAME[c]).join('/')+' deck, colorless included.</p>':'');
+  if(!items.length)return h+'<div class="sheet empty"><p>'+(ui.filter==='needed'&&!qq?'Every deck is covered by your collection.':'No cards match.')+'</p></div>';
+  h+='<p class="note">'+fmt(items.length)+' shown</p><div class="sheet">';
+  for(const x of items.slice(0,ui.limit)){
+    const open=ui.open===x.k,i=INFO[x.k];
+    if(ui.filter==='needed'){
+      h+='<div><button class="row '+(x.proxied?'s-proxy':'s-missing')+'" data-act="open" data-k="'+esc(x.k)+'" aria-expanded="'+open+'"><span class="main"><span class="name">'+esc(x.name)+'</span><div class="sub">Own '+x.own+', decks use '+x.u+(x.proxied?', proxied everywhere':'')+'</div></span><span class="qty">+'+x.need+'</span></button>';
+    }else{
+      h+='<div><button class="row'+(x.u>x.own?' s-short':x.u?' s-owned':'')+'" data-act="open" data-k="'+esc(x.k)+'" aria-expanded="'+open+'"><span class="main"><span class="name">'+esc(x.name)+' '+pips(i?.ci)+'</span><div class="sub">'+esc(i?i.tl:'')+'</div></span>'+
+        (x.u?'<span class="badge'+(x.u>x.own?' warn':'')+'">'+x.u+' in decks</span>':'')+'<span class="qty">'+x.own+'</span></button>';
+    }
+    if(open){
+      h+='<div class="detail">'+infoBlock(x.k);
+      const rows=IX.owned.get(x.k)?.rows||[];
+      if(rows.length){h+='<h3>Printings</h3><div class="wrap"><table>'+rows.map(r=>'<tr><td>'+r.qty+'×</td><td>'+esc([r.set,r.num&&'#'+r.num].filter(Boolean).join(' '))+(r.foil?' foil':'')+'</td><td>'+esc([r.cond,r.lang].filter(Boolean).join(', '))+'</td><td>'+esc(r.binder)+'</td></tr>').join('')+'</table></div>'}
+      const dl=IX.demand.get(x.k)?.list||[];
+      h+='<h3>Decks</h3>'+(dl.length?'<div class="wrap"><table>'+dl.map(d=>'<tr><td>'+d.qty+'×</td><td><button class="back" style="margin:0" data-act="deck" data-id="'+d.id+'">'+esc(d.name)+'</button>'+(d.proxy?' (proxy)':'')+'</td></tr>').join('')+'</table></div>':'<div class="note">Not in any deck.</div>');
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  if(items.length>ui.limit)h+='<button class="more" data-act="more">Show more ('+fmt(items.length-ui.limit)+' left)</button>';
+  return h;
+}
+function deckColors(d){const s=new Set();for(const c of d.cards){const i=INFO[key(c.name)];if(i)for(const x of i.ci)s.add(x)}return WUBRG.filter(c=>s.has(c)).join('')}
+function renderDecks(){
+  const IX=index();
+  let h='<h2>Decks</h2><p class="lead">Decks from ManaBox come in with your CSV. You can also paste a list from anywhere.</p>';
+  if(ui.newDeck){
+    h+='<div class="panel"><label for="dname">Deck name</label><input class="field" id="dname" placeholder="e.g. Poodle Queen">'+
+      '<label for="dlist">Deck list</label><textarea id="dlist" placeholder="1 Sol Ring&#10;1 Command Tower&#10;…&#10;&#10;ManaBox, Moxfield and Archidekt text exports all work."></textarea>'+
+      (ui.deckErr?'<p class="err">'+esc(ui.deckErr)+'</p>':'')+
+      '<div class="actions"><button class="btn primary" data-act="adddeck">Add deck</button><button class="btn" data-act="canceldeck">Cancel</button></div></div>';
+  }else h+='<div class="actions"><button class="btn primary" data-act="newdeck">New deck</button></div>';
+  if(!S.decks.length)return h+(ui.newDeck?'':'<div class="sheet empty"><p>No decks yet. Import your ManaBox CSV, or paste a list.</p></div>');
+  h+='<input class="search" id="dsearch" type="search" placeholder="Search '+S.decks.length+' decks" value="'+esc(ui.dq)+'" autocomplete="off" style="margin-bottom:12px">';
+  const dq=ui.dq.trim().toLowerCase(),list=S.decks.filter(d=>!dq||d.name.toLowerCase().includes(dq)).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!list.length)return h+'<div class="sheet empty"><p>No decks match.</p></div>';
+  h+='<div class="sheet">';
+  for(const d of list){
+    const t=tally(d,IX),miss=t.short+t.missing,cmd=d.cards.find(c=>c.commander);
+    h+='<button class="row" data-act="deck" data-id="'+d.id+'"><span class="main"><span class="name">'+esc(d.name)+' '+pips(deckColors(d))+'</span><div class="sub">'+(cmd?esc(cmd.name)+'. ':'')+(d.source==='manabox'?'From ManaBox, ':'Pasted, ')+t.total+' cards'+(miss?', '+miss+' missing':'')+(t.proxy?', '+t.proxy+' proxies':'')+'</div>'+bar(t,true)+'</span></button>';
+  }
+  return h+'</div>';
+}
+function renderDeck(){
+  const d=S.decks.find(x=>x.id===view.deck);if(!d){view={name:'decks'};return renderDecks()}
+  const IX=index(),t=tally(d,IX);
+  let h='<button class="back" data-act="go" data-v="decks">‹ All decks</button><h2>'+esc(d.name)+'</h2>';
+  const cmds=d.cards.filter(c=>c.commander);if(cmds.length)h+='<p class="cmd">Commander: '+cmds.map(c=>esc(c.name)).join(' and ')+'</p>';
+  const ci=deckColors(d);if(ci)h+='<p class="cmd">Colors '+pips(ci)+'</p>';
+  if(d.source==='manabox')h+='<p class="cmd">From ManaBox. Importing again refreshes this list.</p>';
+  h+=bar(t)+'<div class="legend">'+
+    [['owned','In collection',t.owned],['basic','Basic lands',t.basic],['shared','Shared',t.shared],['proxy','Proxies',t.proxy],['missing','Missing',t.short+t.missing]]
+    .filter(x=>x[2]).map(x=>'<span><i style="background:'+COLORS[x[0]]+'"></i>'+x[1]+' '+x[2]+'</span>').join('')+'<span>Total '+t.total+'</span></div>';
+  h+='<div class="actions"><button class="btn" data-act="copymissing">Copy missing list</button><button class="btn" data-act="copydeck">Copy deck list</button><button class="btn" data-act="edit">'+(ui.edit?'Close editor':'Edit list')+'</button><button class="btn '+(ui.delArm?'armed':'danger')+'" data-act="deldeck">'+(ui.delArm?'Tap again to delete':'Delete deck')+'</button></div>';
+  if(ui.copyText!==null)h+='<div class="panel"><label for="copybox">'+esc(ui.copyText.label)+'</label><textarea id="copybox" readonly>'+esc(ui.copyText.text)+'</textarea><p class="note">'+(ui.copyText.text?'Copied. If it did not copy, select the text above.':'Nothing to copy.')+'</p></div>';
+  if(ui.edit)h+='<div class="panel"><label for="ename">Deck name</label><input class="field" id="ename" value="'+esc(d.name)+'"><label for="elist">Deck list</label><textarea id="elist">'+esc(deckText(d))+'</textarea>'+(ui.deckErr?'<p class="err">'+esc(ui.deckErr)+'</p>':'')+'<p class="note">Proxy marks stay on cards that remain in the list.</p><div class="actions"><button class="btn primary" data-act="savedeck">Save changes</button></div></div>';
+  const pill=(v,l)=>'<button class="chip" data-act="sortby" data-s="'+v+'" aria-pressed="'+(ui.sortBy===v)+'">'+l+'</button>';
+  h+='<div class="chips" role="group" aria-label="Group cards">'+pill('status','By status')+pill('type','By card type')+pill('mv','By mana value')+'</div>';
+  const sorted=[...d.cards].sort((a,b)=>a.name.localeCompare(b.name));
+  if(cmds.length)h+='<div class="group">Commander</div><div class="sheet">'+cmds.map(c=>cardRow(c,d,IX)).join('')+'</div>';
+  const rest=sorted.filter(c=>!c.commander);
+  const groupOut=(label,list)=>list.length?'<div class="group">'+label+' ('+list.reduce((n,c)=>n+c.qty,0)+')</div><div class="sheet">'+list.map(c=>cardRow(c,d,IX)).join('')+'</div>':'';
+  if(ui.sortBy==='type'){
+    for(const ty of TYPES)h+=groupOut(TYPE_LABEL[ty],rest.filter(c=>typeOf(key(c.name))===ty));
+    h+=groupOut('Not looked up yet',rest.filter(c=>!typeOf(key(c.name))));
+    return h;
+  }
+  if(ui.sortBy==='mv'){
+    const nonland=rest.filter(c=>{const ty=typeOf(key(c.name));return ty&&ty!=='Land'});
+    const curve=[0,0,0,0,0,0,0,0];nonland.forEach(c=>{curve[Math.min(7,Math.floor(INFO[key(c.name)]?.mv||0))]+=c.qty});
+    const mx=Math.max(1,...curve);
+    h+='<div class="curve" role="img" aria-label="Mana curve">'+curve.map((n,i)=>'<div><span style="height:'+(n/mx*100)+'%"></span><b>'+n+'</b><em>'+(i===7?'7+':i)+'</em></div>').join('')+'</div>';
+    for(let i=0;i<8;i++)h+=groupOut('Mana value '+(i===7?'7+':i),nonland.filter(c=>Math.min(7,Math.floor(INFO[key(c.name)]?.mv||0))===i));
+    h+=groupOut('Lands',rest.filter(c=>typeOf(key(c.name))==='Land'));
+    h+=groupOut('Not looked up yet',rest.filter(c=>!typeOf(key(c.name))));
+    return h;
+  }
+  for(const [s,label] of [['missing','Not owned'],['short','Own some, need more'],['shared','Owned, but also used in another deck'],['proxy','Proxy printed'],['basic','Basic lands'],['owned','In your collection']])
+    h+=groupOut(label,rest.filter(c=>status(c,IX)===s));
+  return h;
+}
+function cardRow(c,d,IX){
+  const s=status(c,IX),k=key(c.name),own=IX.owned.get(k)?.qty||0,i=INFO[k],open=ui.open===k;
+  const others=(IX.demand.get(k)?.list||[]).filter(x=>x.id!==d.id);
+  let sub='';
+  if(s==='owned')sub='Own '+own+(others.length?', also in '+others.map(o=>esc(o.name)).join(', '):'');
+  else if(s==='shared')sub='Own '+own+', also needed by '+others.map(o=>esc(o.name)).join(', ');
+  else if(s==='short')sub='Own '+own+' of '+c.qty;
+  else if(s==='missing')sub='Not in your collection';
+  else if(s==='proxy')sub=own?'Own '+own+', rest proxied':'Using a proxy';
+  else sub='Basic land';
+  const tog=(s==='owned'||s==='basic')?'':'<button class="toggle" data-act="proxy" data-k="'+esc(k)+'" aria-pressed="'+!!c.proxy+'">'+(c.proxy?'Proxy printed':'Mark proxy')+'</button>';
+  return '<div><div class="row s-'+s+'"><button class="main rowbtn" data-act="open" data-k="'+esc(k)+'" aria-expanded="'+open+'"><span class="name">'+esc(c.name)+(i?.cost?' <span class="cost">'+cost(i.cost)+'</span>':'')+'</span><div class="sub">'+sub+'</div></button>'+tog+'<span class="qty">'+c.qty+'</span></div>'+
+    (open?'<div class="detail">'+infoBlock(k)+'</div>':'')+'</div>';
+}
+function renderImport(){
+  let h='<h2>Import</h2><p class="lead">In ManaBox, export your whole collection as a CSV, then pick that file here. Decks in ManaBox come in automatically. Importing again replaces the collection and those decks; decks you pasted here and your proxy marks stay.</p>';
+  if(S.cards.length){
+    const miss=missingInfo().size;
+    h+='<div class="panel"><strong>'+fmt(S.cards.reduce((s,r)=>s+r.qty,0))+' cards</strong> in your collection'+(S.importedAt?', imported '+new Date(S.importedAt).toLocaleDateString():'')+'.'+
+      '<p class="note" style="margin-bottom:0">Card details from Scryfall: '+fmt(Object.keys(INFO).length)+' cards'+(miss?', '+fmt(miss)+' still to look up. <button class="back" style="margin:0" data-act="fetch">Look up now</button>':'.')+'</p></div>';
+  }
+  if(ui.pending){
+    const p=ui.pending,copies=p.cards.reduce((s,r)=>s+r.qty,0),uniq=new Set(p.cards.map(r=>key(r.name))).size;
+    h+='<div class="panel"><p style="margin-top:0">Found <strong>'+fmt(uniq)+'</strong> unique cards, <strong>'+fmt(copies)+'</strong> copies, and <strong>'+fmt(p.decks.length)+'</strong> decks.'+
+      (p.skipped?' '+fmt(p.skipped)+' wishlist cards are left out.':'')+(p.proxies?' '+fmt(p.proxies)+' proxies count toward decks, not your collection.':'')+'</p><div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="confirmimport">Replace my collection</button><button class="btn" data-act="cancelimport">Cancel</button></div></div>';
+  }else{
+    h+='<div class="panel"><label for="file">ManaBox CSV file</label><input id="file" type="file" accept=".csv,text/csv,text/plain">'+
+      '<label for="paste">Or paste the CSV text</label><textarea id="paste" placeholder="Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,…"></textarea>'+
+      '<div class="actions"><button class="btn" data-act="readpaste">Read pasted CSV</button></div>'+(ui.importErr?'<p class="err">'+esc(ui.importErr)+'</p>':'')+'</div>';
+  }
+  h+='<h2 style="margin-top:22px">Sync with GitHub</h2>';
+  if(SY){
+    h+='<div class="panel"><p style="margin-top:0">Syncing with <strong>'+esc(SY.owner+'/'+SY.repo)+'</strong>'+(SY.syncedAt?', last synced '+new Date(SY.syncedAt).toLocaleString():'')+'.</p>'+
+      '<p class="note">Changes upload a few seconds after you make them, and the latest copy downloads when you open the page.</p>'+
+      '<div class="actions" style="margin-bottom:0"><button class="btn" data-act="syncnow">Sync now</button><button class="btn danger" data-act="disconnect">Disconnect this device</button></div></div>';
+  }else{
+    h+='<p class="lead">Keep your collection, decks and proxy marks the same on every device, saved to a private GitHub repo. Do this once on each device.</p><div class="panel">'+
+      '<ol class="steps"><li><a href="https://github.com/new" target="_blank" rel="noopener">Create a new repository</a> named something like <code>card-binder-data</code>, and set it to <strong>Private</strong>.</li>'+
+      '<li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a>. Under Repository access pick <strong>Only select repositories</strong> and choose that repo. Under Permissions, set <strong>Contents</strong> to <strong>Read and write</strong>. Pick an expiration, then generate it and copy it.</li>'+
+      '<li>Fill in the fields below and connect.</li></ol>'+
+      '<label for="ghowner">GitHub username</label><input class="field" id="ghowner" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+      '<label for="ghrepo">Repository name</label><input class="field" id="ghrepo" placeholder="card-binder-data" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+      '<label for="ghtoken">Token</label><input class="field" id="ghtoken" type="password" placeholder="github_pat_…" autocomplete="off">'+
+      (ui.syncErr?'<p class="err">'+esc(ui.syncErr)+'</p>':'')+
+      '<div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="connect"'+(ui.connecting?' disabled':'')+'>'+(ui.connecting?'Connecting…':'Connect')+'</button></div>'+
+      '<p class="note" style="margin-bottom:0">The token is stored only in this browser and only unlocks that one repo. You can revoke it on GitHub anytime.</p></div>';
+  }
+  h+='<h2 style="margin-top:22px">Backup</h2><p class="lead">Everything is saved in this browser only. Save a backup file to move your decks and proxy marks to another device, or to keep them safe.</p><div class="panel">';
+  if(ui.backup){
+    h+='<p style="margin-top:0">Backup has <strong>'+fmt(ui.backup.cards.length)+'</strong> collection rows and <strong>'+fmt(ui.backup.decks.length)+'</strong> decks. Loading it replaces everything here.</p><div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="confirmbackup">Load backup</button><button class="btn" data-act="cancelbackup">Cancel</button></div>';
+  }else{
+    h+='<div class="actions" style="margin-top:0"><button class="btn" data-act="export">Save backup file</button></div><label for="bfile">Load a backup file</label><input id="bfile" type="file" accept=".json,application/json">'+(ui.backupErr?'<p class="err">'+esc(ui.backupErr)+'</p>':'');
+  }
+  return h+'</div><p class="note" style="margin-top:18px">Card details and images come from Scryfall. Not affiliated with Wizards of the Coast.</p>';
+}
+function conflictPanel(){
+  const c=ui.conflict;if(!c)return '';
+  const when=c.data.savedAt?new Date(c.data.savedAt).toLocaleString():'unknown time';
+  return '<div class="panel conflict"><strong>Your data changed both here and in GitHub.</strong><p class="note" style="margin:6px 0 0">This device: '+fmt(S.decks.length)+' decks, '+fmt(S.cards.length)+' collection rows. GitHub: '+fmt(c.data.decks.length)+' decks, '+fmt(c.data.cards.length)+' rows, saved '+esc(when)+'. The other copy stays in the repo’s history either way.</p>'+
+    '<div class="actions" style="margin-bottom:0"><button class="btn primary" data-act="keeplocal">Keep this device’s copy</button><button class="btn" data-act="keepremote">Use GitHub’s copy</button></div></div>';
+}
+function render(){
+  const a=document.activeElement,aid=a&&a.id,ss=a&&a.selectionStart,se=a&&a.selectionEnd;
+  const app=document.getElementById('app');
+  app.innerHTML=conflictPanel()+(view.name==='collection'?renderCollection():view.name==='decks'?renderDecks():view.name==='deck'?renderDeck():renderImport());
+  const tab=view.name==='deck'?'decks':view.name;
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.view===tab?'page':'false'));
+  if(aid==='search'||aid==='dsearch'){const el=document.getElementById(aid);if(el){el.focus();try{el.setSelectionRange(ss,se)}catch(e){}}}
+}
+
+/* ---------- events ---------- */
+function go(name,deck){view={name,deck};Object.assign(ui,{open:null,limit:150,edit:false,delArm:false,copyText:null,deckErr:'',newDeck:false,dq:''});render();window.scrollTo(0,0)}
+function readFile(file,cb){const r=new FileReader();r.onload=()=>cb(String(r.result));r.onerror=()=>cb(null);r.readAsText(file)}
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.view)});
+document.getElementById('app').addEventListener('input',e=>{
+  if(e.target.id==='search'){ui.q=e.target.value;ui.limit=150;render()}
+  else if(e.target.id==='dsearch'){ui.dq=e.target.value;render()}
+});
+document.getElementById('app').addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='tsel'){ui.type=t.value;ui.limit=150;render();return}
+  if(!t.files||!t.files[0])return;
+  if(t.id==='file')readFile(t.files[0],txt=>{if(txt==null){ui.importErr='Could not read that file.'}else try{ui.pending=readCollection(txt);ui.importErr=''}catch(err){ui.importErr=err.message}render()});
+  if(t.id==='bfile')readFile(t.files[0],txt=>{
+    try{ui.backup=fromFile(JSON.parse(txt));ui.backupErr=''}
+    catch(err){ui.backupErr='That is not a Card Binder backup file.'}render();
+  });
+});
+function copyOut(label,text){
+  ui.copyText={label,text};render();
+  if(text&&navigator.clipboard)navigator.clipboard.writeText(text).catch(()=>{});
+  const box=document.getElementById('copybox');if(box)box.select();
+}
+document.getElementById('app').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const act=b.dataset.act;
+  if(act==='go')go(b.dataset.v);
+  else if(act==='filter'){ui.filter=b.dataset.f;ui.limit=150;ui.open=null;render()}
+  else if(act==='color'){const c=b.dataset.c;ui.colors.has(c)?ui.colors.delete(c):ui.colors.add(c);ui.limit=150;render()}
+  else if(act==='open'){ui.open=ui.open===b.dataset.k?null:b.dataset.k;render()}
+  else if(act==='more'){ui.limit+=300;render()}
+  else if(act==='deck')go('deck',b.dataset.id);
+  else if(act==='fetch')fetchInfo();
+  else if(act==='newdeck'){ui.newDeck=true;ui.deckErr='';render();document.getElementById('dname').focus()}
+  else if(act==='canceldeck'){ui.newDeck=false;render()}
+  else if(act==='adddeck'){
+    const name=document.getElementById('dname').value.trim(),cards=parseDeck(document.getElementById('dlist').value);
+    if(!name){ui.deckErr='Give the deck a name.';return render()}
+    if(!cards.length){ui.deckErr='No cards found. Each line should look like "1 Sol Ring".';return render()}
+    const d={id:uid(),name,source:'pasted',cards};S.decks.push(d);save();go('deck',d.id);fetchInfo();
+  }
+  else if(act==='proxy'){
+    const d=S.decks.find(x=>x.id===view.deck);if(!d)return;
+    const k=b.dataset.k,on=!d.cards.find(c=>key(c.name)===k)?.proxy;
+    d.cards.forEach(c=>{if(key(c.name)===k)c.proxy=on});save();render();
+  }
+  else if(act==='sortby'){ui.sortBy=b.dataset.s;render()}
+  else if(act==='edit'){ui.edit=!ui.edit;ui.deckErr='';render()}
+  else if(act==='savedeck'){
+    const d=S.decks.find(x=>x.id===view.deck);if(!d)return;
+    const name=document.getElementById('ename').value.trim()||d.name,cards=parseDeck(document.getElementById('elist').value);
+    if(!cards.length){ui.deckErr='No cards found. Each line should look like "1 Sol Ring".';return render()}
+    const prev=new Map(d.cards.map(c=>[key(c.name),c.proxy]));
+    cards.forEach(c=>{c.proxy=!!prev.get(key(c.name))});
+    d.name=name;d.cards=cards;ui.edit=false;ui.deckErr='';save();render();fetchInfo();
+  }
+  else if(act==='deldeck'){
+    if(!ui.delArm){ui.delArm=true;render();setTimeout(()=>{if(ui.delArm){ui.delArm=false;render()}},4000);return}
+    S.decks=S.decks.filter(x=>x.id!==view.deck);save();go('decks');
+  }
+  else if(act==='copymissing'){
+    const d=S.decks.find(x=>x.id===view.deck),IX=index();
+    copyOut('Missing cards',d.cards.filter(c=>['missing','short','shared'].includes(status(c,IX))).map(c=>{const own=IX.owned.get(key(c.name))?.qty||0;return (status(c,IX)==='short'?c.qty-own:c.qty)+' '+c.name}).join('\n'));
+  }
+  else if(act==='copydeck'){const d=S.decks.find(x=>x.id===view.deck);copyOut('Deck list',deckText(d))}
+  else if(act==='readpaste'){
+    try{ui.pending=readCollection(document.getElementById('paste').value);ui.importErr=''}catch(err){ui.importErr=err.message}render();
+  }
+  else if(act==='cancelimport'){ui.pending=null;render()}
+  else if(act==='confirmimport'){
+    const p=ui.pending;ui.pending=null;
+    const oldMB=S.decks.filter(d=>d.source==='manabox'),byName=new Map(oldMB.map(d=>[d.name,d]));
+    const mb=p.decks.map(nd=>{const od=byName.get(nd.name);const marks=new Map((od?od.cards:[]).map(c=>[key(c.name),c.proxy]));
+      nd.cards.forEach(c=>{c.proxy=c.proxy||!!marks.get(key(c.name))});return {id:od?od.id:uid(),name:nd.name,source:'manabox',cards:nd.cards}});
+    S.cards=p.cards;S.importedAt=Date.now();S.decks=[...S.decks.filter(d=>d.source!=='manabox'),...mb];
+    save();go('collection');fetchInfo();
+  }
+  else if(act==='export'){
+    const blob=new Blob([toFile()],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='card-binder-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  }
+  else if(act==='connect'){
+    const o=document.getElementById('ghowner').value.trim(),r=document.getElementById('ghrepo').value.trim(),t=document.getElementById('ghtoken').value.trim();
+    ui.connecting=true;ui.syncErr='';render();
+    connect(o,r,t).then(()=>{ui.connecting=false;render();syncNow()}).catch(err=>{ui.connecting=false;ui.syncErr=err instanceof TypeError?'Couldn’t reach GitHub. Check your connection.':err.message;render()});
+  }
+  else if(act==='syncnow')syncNow();
+  else if(act==='disconnect'){SY=null;saveSY();ui.conflict=null;syncStatus();render()}
+  else if(act==='keeplocal'){const c=ui.conflict;ui.conflict=null;SY.sha=c.sha;setDirty(true);saveSY();render();syncNow()}
+  else if(act==='keepremote'){const c=ui.conflict;ui.conflict=null;applyRemote(c);SY.syncedAt=Date.now();saveSY();syncStatus()}
+  else if(act==='cancelbackup'){ui.backup=null;render()}
+  else if(act==='confirmbackup'){
+    const o=ui.backup;ui.backup=null;S={cards:o.cards,decks:o.decks,importedAt:o.importedAt||null};save();go('collection');fetchInfo();
+  }
+});
+
+(async()=>{
+  setSync('Loading…');
+  try{const st=await idbGet('state');if(st&&Array.isArray(st.cards))S=st;INFO=(await idbGet('info'))||{};syncStatus()}
+  catch(e){canSave=false;setSync('This browser blocks storage, so changes won’t be kept')}
+  render();if(SY)await syncNow();fetchInfo();
+})();
+</script>
+</body>
+</html>
